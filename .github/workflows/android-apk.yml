@@ -1,51 +1,74 @@
-name: Build Android APK
+name: Build Simple Translator
 
 on:
   workflow_dispatch:
-    inputs:
-      variant:
-        description: Build variant
-        required: false
-        default: debug
-        type: choice
-        options:
-          - debug
-          - release
 
 jobs:
-  build-apk:
+  build-android:
     runs-on: ubuntu-latest
-    timeout-minutes: 60
     steps:
-      - name: Checkout
+      - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Setup Node
+      - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '18'
+          node-version: '22'
           cache: 'yarn'
+
+      - name: Install Dependencies
+        run: yarn install
 
       - name: Setup Java
         uses: actions/setup-java@v4
         with:
-          distribution: 'temurin'
           java-version: '17'
+          distribution: 'temurin'
+          cache: gradle
 
-      - name: Install dependencies
-        run: yarn install --frozen-lockfile
-
-      - name: Build APK
-        working-directory: android
+      # 【新增步骤】生成假的 google-services.json 骗过构建系统
+      - name: Create dummy google-services.json
         run: |
-          if [ "${{ inputs.variant }}" = "release" ]; then
-            ./gradlew assembleRelease
-          else
-            ./gradlew assembleDebug
-          fi
+          cat <<EOF > android/app/google-services.json
+          {
+            "project_info": {
+              "project_number": "123456789012",
+              "project_id": "dummy-project-id",
+              "storage_bucket": "dummy-project-id.appspot.com"
+            },
+            "client": [
+              {
+                "client_info": {
+                  "mobilesdk_app_id": "1:123456789012:android:321abc456def7890",
+                  "android_client_info": {
+                    "package_name": "com.pocketpalai"
+                  }
+                },
+                "oauth_client": [],
+                "api_key": [
+                  {
+                    "current_key": "dummy_api_key"
+                  }
+                ],
+                "services": {
+                  "appinvite_service": {
+                    "other_platform_oauth_client": []
+                  }
+                }
+              }
+            ],
+            "configuration_version": "1"
+          }
+          EOF
+
+      - name: Build Android APK
+        run: |
+          cd android
+          chmod +x gradlew
+          ./gradlew assembleDebug --no-daemon
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: app-${{ inputs.variant }}-apk
-          path: android/app/build/outputs/apk/${{ inputs.variant }}/
+          name: SimpleTranslator-APK
+          path: android/app/build/outputs/apk/debug/app-debug.apk
